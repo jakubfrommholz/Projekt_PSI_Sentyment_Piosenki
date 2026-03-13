@@ -8,5 +8,5 @@ Title: Nazwa Piosenki
 Artist: Wykonawca 1; Wykonawca 2
 Year: RRRR
 Genre: Gatunek 1; Gatunek 2
----
+
 [tekst piosenki]
