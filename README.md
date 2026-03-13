@@ -8,5 +8,5 @@ Title:
 Artist:  
 Year:  
 Genre:  
-
+'----'
 [Tekst piosenki]
