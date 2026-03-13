@@ -4,5 +4,9 @@ Wszystkie dane tekstowe muszą znajdować się w folderze data/ i być zakodowan
 
 Wzór pliku .txt
 
-Title:
-Artist: 
+Title:  
+Artist:  
+Year:  
+Genre:  
+
+[Tekst piosenki]
