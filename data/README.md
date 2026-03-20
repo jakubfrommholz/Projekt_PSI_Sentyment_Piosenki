@@ -7,5 +7,5 @@ Artist:
 Year:  
 Place:  
 Genre:  
-'----'
+'----'  
 [Tekst piosenki]
