@@ -4,7 +4,6 @@ Year: 2025
 Place: 7
 Genre: chamber pop
 '----'
-[Verse 1]
 They say, "The holy water's watered down
 And this town's lost its faith
 Our colors will fade eventually"
@@ -12,12 +11,10 @@ So, if our time is runnin' out
 Day after day
 We'll make the mundane our masterpiece
 
-[Pre-Chorus]
 Oh, my, my
 Oh, my, my love
 I take one look at you
 
-[Chorus]
 You're takin' me out of the ordinary
 I want you layin' me down 'til we're dead and buried
 On the edge of your knife, stayin' drunk on your vine
@@ -27,7 +24,6 @@ You got me kissin' thе ground of your sanctuary
 Shatter me with your touch, oh, Lord, return mе to dust
 The angels up in the clouds are jealous knowin' we found
 
-[Verse 2]
 Hopeless hallelujah
 On this side of Heaven's gate
 Oh, my life, how do ya
@@ -35,10 +31,8 @@ Breathe and take my breath away?
 At your altar, I will pray
 You're the sculptor, I'm the clay
 
-[Pre-Chorus]
 Oh, my, my
 
-[Chorus]
 You're takin' me out of the ordinary
 I want you layin' me down 'til we're dead and buried
 On the edge of your knife, stayin' drunk on your vine
@@ -48,13 +42,11 @@ You got me kissing the ground (Ground) of your sanctuary (Sanctuary)
 Shatter me with your touch, oh, Lord, return me to dust
 The angels up in the clouds are jealous knowin' we found
 
-[Bridge]
 Somethin' so heavenly, higher than ecstasy
 Whenever you're next to me, oh, my, my
 World was in black and white until I saw your light
 I thought you had to die to find
 
-[Chorus]
 Somethin' so out of the ordinary
 I want you laying me down 'til we're dead and buried
 On the edge of your knife, stayin' drunk on your vine
