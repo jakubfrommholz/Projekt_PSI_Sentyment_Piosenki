@@ -4,7 +4,6 @@ Year: 2025
 Place: 6
 Genre: pop rock; folk rock
 '----'
-[Verse 1]
 For a while there, it was rough
 But lately, I've been doin' better
 Than the last four cold Decembers I recall
@@ -18,24 +17,20 @@ And I hold you every night
 And that's a feeling I wanna get used to
 But there's no man as terrified as the man who stands to lose you
 
-[Pre-Chorus]
 Oh, I hope I don't losе you
 Mm, please stay
 I want you, I need you, oh God
 Don't take
 Thеse beautiful things that I've got
 
-[Chorus]
 Please stay
 I want you, I need you, oh God
 Don't take
 These beautiful things that I've got
 
-[Post-Chorus]
 Oh, ooh
 Please don't take
 
-[Verse 2]
 I found my mind, I'm feelin' sane
 It's been a while, but I'm finding my faith
 If everything's good and it's great, why do I sit and wait 'til it's gone?
@@ -43,16 +38,13 @@ Oh, I'll tell ya, I know I've got enough
 I've got peace and I've got love
 But I'm up at night thinkin' I just might lose it all
 
-[Chorus]
 Please stay
 I want you, I need you, oh God
 Don't take
 These beautiful things that I've got
 
-[Post-Chorus]
 Oh, ooh
 
-[Outro]
 Please stay
 I want you, I need you, oh God
 I need
