@@ -9,3 +9,11 @@ Place:
 Genre:  
 '----'  
 [Tekst piosenki]
+
+Lata do opracowania
+~~2025~~
+~~2020~~
+~~2015~~
+2010
+2005
+2000
