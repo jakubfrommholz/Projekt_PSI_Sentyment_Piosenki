@@ -2,10 +2,10 @@
 
 Wzór pliku .txt
 
-Title:
-Artist:
-Year:
-Place:
-Genre:
+Title:  
+Artist:  
+Year:  
+Place:  
+Genre:  
 '----'
 [Tekst piosenki]
