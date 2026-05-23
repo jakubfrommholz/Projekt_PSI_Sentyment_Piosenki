@@ -1,6 +1,20 @@
-# Analiza Sentymentu Piosenek Billboard
-# Autor: Magdalena Rychlewska, Jakub Frommholz
-
+#' ---
+#' title: "Analiza Sentymentu Piosenek Billboard"
+#' author: "Magdalena Rychlewska, Jakub Frommholz"
+#' date: "23.05.2026"
+#' output:
+#'   html_document:
+#'     df_print: paged
+#'     theme: readable
+#'     highlight: kate
+#'     toc: false
+#'     toc_depth: 3
+#'     toc_float:
+#'       collapsed: false
+#'       smooth_scroll: true
+#'     code_folding: show    
+#'     number_sections: false 
+#' ---
 
 # 1. Wczytanie bibliotek ----
 
@@ -73,7 +87,7 @@ songs <- songs[songs$text != "", ]
 songs$song_id <- seq_len(nrow(songs))
 songs$title[is.na(songs$title) | songs$title == ""] <- songs$file[is.na(songs$title) | songs$title == ""]
 
-cat("Wczytano", nrow(songs), "piosenek\n")
+print("Wczytano", nrow(songs), "piosenek\n")
 
 
 # 3. Tokenizacja i czyszczenie tekstu ----
@@ -98,7 +112,7 @@ tokens <- songs %>%
 # Stemming
 tokens$stem <- wordStem(tokens$word, language = "en")
 
-cat("Liczba tokenów:", nrow(tokens), "\n")
+print("Liczba tokenów:", nrow(tokens), "\n")
 
 
 # 4. Chmury słów ----
@@ -190,7 +204,7 @@ bing_summary <- sentiment_bing_year %>%
 sentiment_results <- merge(sentiment_afinn_yearly, bing_summary, by = "year", all = TRUE)
 sentiment_results <- sentiment_results[order(sentiment_results$year), ]
 
-cat("\nWyniki analizy sentymentu:\n")
+print("\nWyniki analizy sentymentu:\n")
 print(sentiment_results)
 
 # Wykres AFINN
@@ -316,7 +330,7 @@ print(
   ggplot(pca_bow_df, aes(x = PC1, y = PC2, color = cluster)) +
     geom_point(size = 3, alpha = 0.7) +
     labs(
-      title = paste("K-means (BoW), k =", best_k_bow, "- PCA"),
+      title = paste("K-means (BoW), k =", best_k_bow),
       x = paste("PC1 (", round(summary(pca_bow)$importance[2, 1] * 100, 1), "%)"),
       y = paste("PC2 (", round(summary(pca_bow)$importance[2, 2] * 100, 1), "%)")
     ) +
@@ -360,7 +374,7 @@ print(
   ggplot(pca_tfidf_df, aes(x = PC1, y = PC2, color = cluster)) +
     geom_point(size = 3, alpha = 0.7) +
     labs(
-      title = paste("K-means (TF-IDF), k =", best_k_tfidf, "- PCA"),
+      title = paste("K-means (TF-IDF), k =", best_k_tfidf),
       x = paste("PC1 (", round(summary(pca_tfidf)$importance[2, 1] * 100, 1), "%)"),
       y = paste("PC2 (", round(summary(pca_tfidf)$importance[2, 2] * 100, 1), "%)")
     ) +
@@ -370,15 +384,13 @@ print(
 
 # 7. Podsumowanie wyników ----
 
-cat("\n========== PODSUMOWANIE ANALIZY ==========\n")
-cat("Liczba przeanalizowanych piosenek:", nrow(songs), "\n")
-cat("Lata:", paste(sort(unique(songs$year)), collapse = ", "), "\n")
-cat("Liczba unikalnych słów (po czyszczeniu):", length(unique(tokens$word)), "\n")
-cat("Liczba unikalnych rdzeni:", length(unique(tokens$stem)), "\n")
-cat("\nTop 20 najczęstszych słów:\n")
+print("\n========== PODSUMOWANIE ANALIZY ==========\n")
+print("Liczba przeanalizowanych piosenek:", nrow(songs), "\n")
+print("Lata:", paste(sort(unique(songs$year)), collapse = ", "), "\n")
+print("Liczba unikalnych słów (po czyszczeniu):", length(unique(tokens$word)), "\n")
+print("Liczba unikalnych rdzeni:", length(unique(tokens$stem)), "\n")
+print("\nTop 20 najczęstszych słów:\n")
 print(head(freq_all, 20))
-
-cat("\nOptymalne k (BoW):", best_k_bow, "\n")
-cat("Optymalne k (TF-IDF):", best_k_tfidf, "\n")
-
-cat("\n========== ANALIZA ZAKONCZONA ==========\n")
+print("\nOptymalne k (BoW):", best_k_bow, "\n")
+print("Optymalne k (TF-IDF):", best_k_tfidf, "\n")
+print("\n========== ANALIZA ZAKONCZONA ==========\n")
