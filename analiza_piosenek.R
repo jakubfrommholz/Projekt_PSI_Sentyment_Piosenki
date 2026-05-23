@@ -1,4 +1,3 @@
-
 # Analiza Sentymentu Piosenek Billboard
 # Autor: Magdalena Rychlewska, Jakub Frommholz
 
