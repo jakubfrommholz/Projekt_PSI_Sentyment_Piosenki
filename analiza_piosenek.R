@@ -1,5 +1,5 @@
 #' ---
-#' title: "Analiza Sentymentu Piosenek Billboard"
+#' title: "Analiza sentymentu piosenek z list Billboard"
 #' author: "Magdalena Rychlewska, Jakub Frommholz"
 #' date: "23.05.2026"
 #' output:
@@ -87,7 +87,7 @@ songs <- songs[songs$text != "", ]
 songs$song_id <- seq_len(nrow(songs))
 songs$title[is.na(songs$title) | songs$title == ""] <- songs$file[is.na(songs$title) | songs$title == ""]
 
-print("Wczytano", nrow(songs), "piosenek\n")
+cat("Wczytano", nrow(songs), "piosenek\n")
 
 
 # 3. Tokenizacja i czyszczenie tekstu ----
@@ -112,7 +112,7 @@ tokens <- songs %>%
 # Stemming
 tokens$stem <- wordStem(tokens$word, language = "en")
 
-print("Liczba tokenów:", nrow(tokens), "\n")
+cat("Liczba tokenów:", nrow(tokens), "\n")
 
 
 # 4. Chmury słów ----
@@ -204,7 +204,7 @@ bing_summary <- sentiment_bing_year %>%
 sentiment_results <- merge(sentiment_afinn_yearly, bing_summary, by = "year", all = TRUE)
 sentiment_results <- sentiment_results[order(sentiment_results$year), ]
 
-print("\nWyniki analizy sentymentu:\n")
+cat("\nWyniki analizy sentymentu:\n")
 print(sentiment_results)
 
 # Wykres AFINN
@@ -267,10 +267,6 @@ corp <- VCorpus(VectorSource(songs_text$stem))
 dtm <- DocumentTermMatrix(corp, control = list(wordLengths = c(3, Inf)))
 dtm <- removeSparseTerms(dtm, sparse = 0.98)
 dtm_matrix <- as.matrix(dtm)
-
-if (ncol(dtm_matrix) < 2) {
-  stop("Za mało cech do klastrowania. Zmień próg sparse terms.")
-}
 
 # Skalowanie
 dtm_scaled <- scale(dtm_matrix)
@@ -384,13 +380,13 @@ print(
 
 # 7. Podsumowanie wyników ----
 
-print("\n========== PODSUMOWANIE ANALIZY ==========\n")
-print("Liczba przeanalizowanych piosenek:", nrow(songs), "\n")
-print("Lata:", paste(sort(unique(songs$year)), collapse = ", "), "\n")
-print("Liczba unikalnych słów (po czyszczeniu):", length(unique(tokens$word)), "\n")
-print("Liczba unikalnych rdzeni:", length(unique(tokens$stem)), "\n")
-print("\nTop 20 najczęstszych słów:\n")
+cat("\n========== PODSUMOWANIE ANALIZY ==========\n")
+cat("Liczba przeanalizowanych piosenek:", nrow(songs), "\n")
+cat("Lata:", paste(sort(unique(songs$year)), collapse = ", "), "\n")
+cat("Liczba unikalnych słów (po czyszczeniu):", length(unique(tokens$word)), "\n")
+cat("Liczba unikalnych rdzeni:", length(unique(tokens$stem)), "\n")
+cat("\nTop 20 najczęstszych słów:\n")
 print(head(freq_all, 20))
-print("\nOptymalne k (BoW):", best_k_bow, "\n")
-print("Optymalne k (TF-IDF):", best_k_tfidf, "\n")
-print("\n========== ANALIZA ZAKONCZONA ==========\n")
+cat("\nOptymalne k (BoW):", best_k_bow, "\n")
+cat("Optymalne k (TF-IDF):", best_k_tfidf, "\n")
+cat("\n========== ANALIZA ZAKONCZONA ==========\n")
