@@ -1,363 +1,385 @@
-#' ---
-#' title: "Analiza Sentymentu Piosenek Bilboard"
-#' author: "Magdalena Rychlewska, Jakub Frommholz"
-#' output:
-#'    html_document:
-#'      df_print(: paged
-#'      theme: cerulean
-#'      highlight: default
-#'      toc: yes
-#'      toc_depth: 3
-#'      toc_float:
-#'         collapsed: false
-#'         smooth_scroll: true
-#'      code_fold: show
-#' ---
-#' 
-#' 
 
-knitr::opts_chunk$set(
-  message = FALSE,
-  warning = FALSE
-)
+# Analiza Sentymentu Piosenek Billboard
+# Autor: Magdalena Rychlewska, Jakub Frommholz
 
 
-# ## 1. Wczytywanie danych
-#' W tej sekcji wczytujemy pliki tekstowe i parsujemy metadane oraz tekst piosenki.
+# 1. Wczytanie bibliotek ----
 
-# Wymagane pakiety ----
 library(tm)
-library(wordcloud)
-library(RColorBrewer)
-library(ggplot2)
 library(tidyverse)
 library(tidytext)
 library(textdata)
-library(SentimentAnalysis)
-library(stringr)
+library(ggplot2)
+library(wordcloud)
+library(RColorBrewer)
 library(SnowballC)
 library(cluster)
-library(DT)
-library(topicmodels)
 
 set.seed(42)
 
-txt_files <- list.files(pattern = "\\.txt$", full.names = TRUE)
 
-## Funkcja pomocnicza: wyciąga wartość pola (np. Title, Artist) z nagłówka pliku
+# 2. Wczytanie danych ----
+
+# Funkcja do ekstrakcji pola z nagłówka pliku
 extract_field <- function(lines, field) {
-  # Szuka linii zaczynającej się od "Field:"
-  hit <- grep(paste0("^", field, ":"), lines, ignore.case = TRUE, value = TRUE)
-  if (length(hit) == 0) return(NA_character_)
-  # Usuwa część przed dwukropkiem i przycina spacje
-  str_trim(sub(paste0("^", field, ":"), "", hit[1], ignore.case = TRUE))
+  result <- grep(paste0("^", field, ":"), lines, ignore.case = TRUE, value = TRUE)
+  if (length(result) == 0) return(NA_character_)
+  value <- sub(paste0("^", field, ":"), "", result[1], ignore.case = TRUE)
+  trimws(value)
 }
 
+# Funkcja do wczytania piosenki
 read_song <- function(path) {
   lines <- readLines(path, warn = FALSE, encoding = "UTF-8")
-  # Parsowanie pól metadanych
+
+  # Ekstrakcja metadanych
   title <- extract_field(lines, "Title")
   artist <- extract_field(lines, "Artist")
   year_raw <- extract_field(lines, "Year")
   place_raw <- extract_field(lines, "Place")
   genre <- extract_field(lines, "Genre")
 
-  # Znajdź separator między metadanymi a tekstem (----)
-  sep_idx <- grep("----", lines)[1]
+  # Znalezienie separatora
+  sep_idx <- grep("^'{0,1}-{4,}'{0,1}$", lines)[1]
   if (is.na(sep_idx)) {
     lyrics <- lines
   } else {
     lyrics <- lines[(sep_idx + 1):length(lines)]
   }
 
-  # Usuń puste linie i połącz w jeden ciąg tekstowy
-  lyrics <- lyrics[nchar(str_trim(lyrics)) > 0]
+  # Usunięcie pustych linii
+  lyrics <- lyrics[nchar(trimws(lyrics)) > 0]
   lyrics_text <- paste(lyrics, collapse = " ")
 
-  tibble(
+  data.frame(
     file = basename(path),
     title = title,
     artist = artist,
-    year = suppressWarnings(as.integer(str_extract(year_raw, "\\d{4}"))),
-    place = suppressWarnings(as.integer(str_extract(place_raw, "\\d+"))),
+    year = as.integer(str_extract(year_raw, "\\d{4}")),
+    place = as.integer(str_extract(place_raw, "\\d+")),
     genre = genre,
-    text = lyrics_text
+    text = lyrics_text,
+    stringsAsFactors = FALSE
   )
 }
 
-songs_raw <- map_dfr(txt_files, read_song)
+# Wczytanie wszystkich piosenek
+txt_files <- list.files(path = "data", pattern = "\\.txt$", full.names = TRUE)
+songs_raw <- do.call(rbind, lapply(txt_files, read_song))
+rownames(songs_raw) <- NULL
 
-songs <- songs_raw %>%
-  # Filtruj niepoprawne / puste dokumenty oraz nadaj identyfikatory
-  filter(!is.na(year), !is.na(text), nchar(str_trim(text)) > 0) %>%
-  mutate(
-    song_id = row_number(),
-    title = if_else(is.na(title) | title == "", file, title)
-  )
+# Filtracja i przygotowanie danych
+songs <- songs_raw[!is.na(songs_raw$year) & !is.na(songs_raw$text), ]
+songs <- songs[songs$text != "", ]
+songs$song_id <- seq_len(nrow(songs))
+songs$title[is.na(songs$title) | songs$title == ""] <- songs$file[is.na(songs$title) | songs$title == ""]
 
-custom_stopwords <- tibble(
-  word = c(
-    stopwords("en"),
-    "na", "la", "oh", "ooh", "yeah", "hey", "uh", "woo", "wanna",
-    "title", "artist", "year", "place", "genre"
-  )
-) %>% distinct()
+cat("Wczytano", nrow(songs), "piosenek\n")
 
-#' ## 2. Czyszczenie i tokenizacja
-#' Usuwamy znaki, stosujemy filtrowanie stop-słów i stemming.
 
-tokens_clean <- songs %>%
+# 3. Tokenizacja i czyszczenie tekstu ----
+
+# Definicja stopwords
+custom_stopwords <- c(
+  stopwords("en"),
+  "na", "la", "oh", "ooh", "yeah", "hey", "uh", "woo", "wanna",
+  "title", "artist", "year", "place", "genre"
+)
+custom_stopwords <- unique(custom_stopwords)
+
+# Tokenizacja
+tokens <- songs %>%
   select(song_id, year, title, artist, text) %>%
   unnest_tokens(word, text) %>%
   mutate(word = str_replace_all(word, "[^a-z']", "")) %>%
   filter(str_detect(word, "[a-z]")) %>%
-  anti_join(custom_stopwords, by = "word") %>%
+  filter(!(word %in% custom_stopwords)) %>%
   filter(nchar(word) > 2)
 
-tokens_stemmed <- tokens_clean %>%
-  mutate(stem = wordStem(word, language = "en"))
+# Stemming
+tokens$stem <- wordStem(tokens$word, language = "en")
 
-#' ## 3. Chmury słów (globalne i roczne)
-#' Generujemy wykresy chmur słów i zapisujemy jako PNG.
+cat("Liczba tokenów:", nrow(tokens), "\n")
 
-freq_all <- tokens_stemmed %>%
-  count(stem, sort = TRUE)
 
-png("wordcloud_global.png", width = 800, height = 600)
+# 4. Chmury słów ----
+
+# Częstość wszystkich słów
+freq_all <- data.frame(table(tokens$stem))
+names(freq_all) <- c("stem", "freq")
+freq_all <- freq_all[order(freq_all$freq, decreasing = TRUE), ]
+
+# Globalna chmura słów
+par(mar = c(2, 2, 2, 2))
 wordcloud(
   words = freq_all$stem,
-  freq = freq_all$n,
-  min.freq = 2,
-  max.words = 200,
+  freq = freq_all$freq,
+  min.freq = 3,
+  max.words = 150,
   random.order = FALSE,
   rot.per = 0.15,
   colors = brewer.pal(8, "Dark2")
 )
-dev.off()
+title("Chmura słów - wszystkie piosenki")
 
-freq_year <- tokens_stemmed %>%
-  count(year, stem, sort = TRUE)
+# Chmury słów po latach
+years <- sort(unique(tokens$year))
+for (yy in years) {
+  freq_year <- data.frame(table(tokens$stem[tokens$year == yy]))
+  names(freq_year) <- c("stem", "freq")
+  freq_year <- freq_year[order(freq_year$freq, decreasing = TRUE), ]
 
-for (yy in sort(unique(freq_year$year))) {
-  freq_y <- freq_year %>% filter(year == yy)
-  if (nrow(freq_y) > 1) {
-    png(paste0("wordcloud_", yy, ".png"), width = 800, height = 600)
+  if (nrow(freq_year) > 1) {
+    par(mar = c(2, 2, 2, 2))
     wordcloud(
-      words = freq_y$stem,
-      freq = freq_y$n,
+      words = freq_year$stem,
+      freq = freq_year$freq,
       min.freq = 2,
-      max.words = 120,
+      max.words = 100,
       random.order = FALSE,
       rot.per = 0.15,
       colors = brewer.pal(8, "Set2")
     )
-    title(paste("Wordcloud -", yy))
-    dev.off()
+    title(paste("Chmura słów -", yy))
   }
 }
 
-#' ## 4. Analiza sentymentu
-#' Szacujemy sentyment QDAP oraz prosty indeks z słownika Bing.
 
-songs_stem_text <- tokens_stemmed %>%
-  group_by(song_id, year, title, artist) %>%
-  summarise(stem_text = paste(stem, collapse = " "), .groups = "drop")
+# 5. Analiza sentymentu ----
 
-sentiment_year <- songs %>%
-  transmute(year, sentiment_qdap = SentimentAnalysis::analyzeSentiment(text)$SentimentQDAP) %>%
+# Wczytanie słowników
+afinn_dict <- read.csv("dictionaries/afinn.csv", stringsAsFactors = FALSE)
+bing_dict <- read.csv("dictionaries/bing.csv", stringsAsFactors = FALSE)
+
+# Analiza AFINN - średni sentyment rocznie
+sentiment_afinn_year <- tokens %>%
+  inner_join(afinn_dict, by = c("word" = "word"))
+
+sentiment_afinn_yearly <- aggregate(
+  value ~ year,
+  data = sentiment_afinn_year,
+  FUN = mean,
+  na.rm = TRUE
+)
+names(sentiment_afinn_yearly) <- c("year", "avg_sentiment_afinn")
+
+# Analiza Bing - liczba słów pozytywnych i negatywnych
+sentiment_bing_year <- tokens %>%
+  inner_join(bing_dict, by = c("word" = "word"))
+
+sentiment_bing_count <- aggregate(
+  cbind(positive = sentiment == "positive", negative = sentiment == "negative") ~ year,
+  data = sentiment_bing_year,
+  FUN = sum
+)
+sentiment_bing_count$positive <- rowSums(sentiment_bing_count[, -1] * (bing_dict$sentiment[match(sentiment_bing_year$word, bing_dict$word)] == "positive"), na.rm = TRUE)
+sentiment_bing_count$negative <- rowSums(sentiment_bing_count[, -1] * (bing_dict$sentiment[match(sentiment_bing_year$word, bing_dict$word)] == "negative"), na.rm = TRUE)
+
+# Liczba słów pozytywnych i negatywnych per rok (szybsza metoda)
+bing_summary <- sentiment_bing_year %>%
   group_by(year) %>%
-  summarise(avg_sentiment_qdap = mean(sentiment_qdap, na.rm = TRUE), .groups = "drop")
-
-bing_sentiment_year <- tokens_clean %>%
-  inner_join(get_sentiments("bing"), by = "word") %>%
-  count(year, sentiment) %>%
-  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
-  mutate(
-    bing_net = positive - negative,
-    bing_index = (positive - negative) / pmax(positive + negative, 1)
+  summarise(
+    positive = sum(sentiment == "positive"),
+    negative = sum(sentiment == "negative")
   ) %>%
-  select(year, bing_net, bing_index)
+  mutate(
+    net_sentiment = positive - negative,
+    sentiment_index = (positive - negative) / pmax(positive + negative, 1)
+  )
 
-sentiment_by_year <- sentiment_year %>%
-  left_join(bing_sentiment_year, by = "year") %>%
-  arrange(year)
+# Połączenie wyników
+sentiment_results <- merge(sentiment_afinn_yearly, bing_summary, by = "year", all = TRUE)
+sentiment_results <- sentiment_results[order(sentiment_results$year), ]
 
-png("sentyment_qdap.png", width = 800, height = 600)
-print((
-  ggplot(sentiment_by_year, aes(x = year, y = avg_sentiment_qdap)) +
-    geom_line(color = "#2c7fb8", linewidth = 1) +
-    geom_point(color = "#2c7fb8", size = 2) +
+cat("\nWyniki analizy sentymentu:\n")
+print(sentiment_results)
+
+# Wykres AFINN
+print(
+  ggplot(sentiment_afinn_yearly, aes(x = year, y = avg_sentiment_afinn)) +
+    geom_line(color = "#e74c3c", linewidth = 1) +
+    geom_point(color = "#e74c3c", size = 3) +
     labs(
-      title = "Sentyment roczny (SentimentAnalysis - QDAP)",
+      title = "Średni sentyment rocznie (AFINN)",
       x = "Rok",
-      y = "Sredni sentyment"
+      y = "Średni sentyment"
     ) +
     theme_minimal()
 )
-dev.off()
 
-png("sentyment_bing.png", width = 800, height = 600)
-print((
-  ggplot(sentiment_by_year, aes(x = year, y = bing_index)) +
+# Wykres Bing - słowa pozytywne i negatywne
+bing_long <- bing_summary %>%
+  select(year, positive, negative) %>%
+  gather(key = "sentiment", value = "count", -year)
+
+print(
+  ggplot(bing_long, aes(x = factor(year), y = count, fill = sentiment)) +
+    geom_col(position = "dodge") +
+    scale_fill_manual(
+      values = c("positive" = "#27ae60", "negative" = "#e74c3c"),
+      labels = c("positive" = "Pozytywne", "negative" = "Negatywne")
+    ) +
+    labs(
+      title = "Liczba słów pozytywnych i negatywnych rocznie (Bing)",
+      x = "Rok",
+      y = "Liczba słów"
+    ) +
+    theme_minimal()
+)
+
+# Wykres Bing - indeks sentymentu
+print(
+  ggplot(bing_summary, aes(x = year, y = sentiment_index)) +
     geom_line(color = "#d95f0e", linewidth = 1) +
-    geom_point(color = "#d95f0e", size = 2) +
+    geom_point(color = "#d95f0e", size = 3) +
     labs(
-      title = "Sentyment roczny (Bing)",
+      title = "Indeks sentymentu rocznie (Bing)",
       x = "Rok",
-      y = "Wskaznik sentymentu"
+      y = "Indeks sentymentu"
     ) +
     theme_minimal()
 )
-dev.off()
 
-corp <- VCorpus(VectorSource(songs_stem_text$stem_text))
+
+# 6. Klastrowanie tekstów ----
+
+# Przygotowanie macierzy DTM
+songs_text <- aggregate(
+  stem ~ song_id + year + title + artist,
+  data = tokens,
+  FUN = function(x) paste(x, collapse = " ")
+)
+
+corp <- VCorpus(VectorSource(songs_text$stem))
 dtm <- DocumentTermMatrix(corp, control = list(wordLengths = c(3, Inf)))
 dtm <- removeSparseTerms(dtm, sparse = 0.98)
-dtm_m <- as.matrix(dtm)
+dtm_matrix <- as.matrix(dtm)
 
-if (ncol(dtm_m) < 2) stop("Za malo cech po czyszczeniu DTM. Zmien prog removeSparseTerms.")
-
-#' ## 5. Klastrowanie i wizualizacje
-#' Budujemy macierz DTM/TF-IDF, skalujemy i dobieramy k przez silhouette.
-
-dtm_scaled <- scale(dtm_m)
-rownames(dtm_scaled) <- songs_stem_text$title
-
-choose_k_silhouette <- function(x, k_min = 2, k_max = 10, nstart = 25) {
-  n_docs <- nrow(x)
-  k_max_eff <- min(k_max, n_docs - 1)
-  if (k_max_eff < k_min) stop("Za malo dokumentow do doboru k.")
-  dist_mat <- dist(x)
-  k_grid <- seq.int(k_min, k_max_eff)
-
-  sil_tbl <- map_dfr(k_grid, function(k) {
-    km <- kmeans(x, centers = k, nstart = nstart, iter.max = 200)
-    sil <- silhouette(km$cluster, dist_mat)
-    tibble(k = k, silhouette = mean(sil[, 3]))
-  })
-
-  best_k <- sil_tbl$k[which.max(sil_tbl$silhouette)]
-  list(best_k = best_k, sil_tbl = sil_tbl)
+if (ncol(dtm_matrix) < 2) {
+  stop("Za mało cech do klastrowania. Zmień próg sparse terms.")
 }
 
-k_eval_bow <- choose_k_silhouette(dtm_scaled, k_min = 2, k_max = 10)
-best_k_bow <- k_eval_bow$best_k
+# Skalowanie
+dtm_scaled <- scale(dtm_matrix)
+rownames(dtm_scaled) <- songs_text$title
+
+# Funkcja do wyboru k metodą łokcia
+choose_k_elbow <- function(x, k_min = 2, k_max = 10) {
+  wcss <- numeric(k_max - k_min + 1)
+  k_seq <- seq(k_min, k_max)
+
+  for (i in seq_along(k_seq)) {
+    km <- kmeans(x, centers = k_seq[i], nstart = 25, iter.max = 200)
+    wcss[i] <- km$tot.withinss
+  }
+
+  # Druga różnica dla znalezienia łokcia
+  if (length(wcss) >= 3) {
+    second_diff <- diff(wcss, differences = 2)
+    elbow_idx <- which.max(second_diff) + 1
+    best_k <- k_seq[elbow_idx]
+  } else {
+    best_k <- k_seq[1]
+  }
+
+  list(best_k = best_k, wcss = wcss, k_seq = k_seq)
+}
+
+# BoW klastrowanie
+elbow_bow <- choose_k_elbow(dtm_scaled, k_min = 2, k_max = 10)
+best_k_bow <- elbow_bow$best_k
 km_bow <- kmeans(dtm_scaled, centers = best_k_bow, nstart = 50, iter.max = 300)
 
-png("silhouette_bow.png", width = 800, height = 600)
-print((
-  ggplot(k_eval_bow$sil_tbl, aes(k, silhouette)) +
+# Wykres metody łokcia dla BoW
+elbow_df_bow <- data.frame(k = elbow_bow$k_seq, wcss = elbow_bow$wcss)
+print(
+  ggplot(elbow_df_bow, aes(x = k, y = wcss)) +
     geom_line(color = "#1b9e77", linewidth = 1) +
-    geom_point(color = "#1b9e77", size = 2) +
-    scale_x_continuous(breaks = k_eval_bow$sil_tbl$k) +
+    geom_point(color = "#1b9e77", size = 3) +
     labs(
-      title = "Dobor k (BoW) - silhouette",
-      x = "k",
-      y = "Srednia silhouette"
+      title = "Metoda łokcia (BoW)",
+      x = "Liczba klastrów (k)",
+      y = "WCSS"
     ) +
     theme_minimal()
 )
-dev.off()
 
-bow_clusters <- tibble(
-  title = songs_stem_text$title,
-  artist = songs_stem_text$artist,
-  year = songs_stem_text$year,
-  cluster_bow = km_bow$cluster
-)
-
+# PCA dla BoW
 pca_bow <- prcomp(dtm_scaled)
-pca_bow_df <- tibble(
-  title = songs_stem_text$title,
+pca_bow_df <- data.frame(
+  title = rownames(dtm_scaled),
   cluster = factor(km_bow$cluster),
   PC1 = pca_bow$x[, 1],
   PC2 = pca_bow$x[, 2]
 )
 
-png("pca_bow_kmeans.png", width = 900, height = 700)
-print((
-  ggplot(pca_bow_df, aes(PC1, PC2, color = cluster, label = title)) +
-    geom_point(size = 3, alpha = 0.85) +
-    geom_text(size = 2, alpha = 0.6, vjust = -0.5) +
+print(
+  ggplot(pca_bow_df, aes(x = PC1, y = PC2, color = cluster)) +
+    geom_point(size = 3, alpha = 0.7) +
     labs(
-      title = paste("K-means (BoW), k =", best_k_bow, "- PCA (PC1 vs PC2)"),
+      title = paste("K-means (BoW), k =", best_k_bow, "- PCA"),
       x = paste("PC1 (", round(summary(pca_bow)$importance[2, 1] * 100, 1), "%)"),
-      y = paste("PC2 (", round(summary(pca_bow)$importance[2, 2] * 100, 1), "%)"),
-      color = "Klaster"
+      y = paste("PC2 (", round(summary(pca_bow)$importance[2, 2] * 100, 1), "%)")
     ) +
     theme_minimal()
 )
-dev.off()
 
-
+# TF-IDF klastrowanie
 dtm_tfidf <- weightTfIdf(dtm)
-tfidf_m <- as.matrix(dtm_tfidf)
-tfidf_scaled <- scale(tfidf_m)
-rownames(tfidf_scaled) <- songs_stem_text$title
+tfidf_matrix <- as.matrix(dtm_tfidf)
+tfidf_scaled <- scale(tfidf_matrix)
+rownames(tfidf_scaled) <- songs_text$title
 
-k_eval_tfidf <- choose_k_silhouette(tfidf_scaled, k_min = 2, k_max = 10)
-best_k_tfidf <- k_eval_tfidf$best_k
+elbow_tfidf <- choose_k_elbow(tfidf_scaled, k_min = 2, k_max = 10)
+best_k_tfidf <- elbow_tfidf$best_k
 km_tfidf <- kmeans(tfidf_scaled, centers = best_k_tfidf, nstart = 50, iter.max = 300)
 
-png("silhouette_tfidf.png", width = 800, height = 600)
-print((
-  ggplot(k_eval_tfidf$sil_tbl, aes(k, silhouette)) +
+# Wykres metody łokcia dla TF-IDF
+elbow_df_tfidf <- data.frame(k = elbow_tfidf$k_seq, wcss = elbow_tfidf$wcss)
+print(
+  ggplot(elbow_df_tfidf, aes(x = k, y = wcss)) +
     geom_line(color = "#7570b3", linewidth = 1) +
-    geom_point(color = "#7570b3", size = 2) +
-    scale_x_continuous(breaks = k_eval_tfidf$sil_tbl$k) +
+    geom_point(color = "#7570b3", size = 3) +
     labs(
-      title = "Dobor k (TF-IDF) - silhouette",
-      x = "k",
-      y = "Srednia silhouette"
+      title = "Metoda łokcia (TF-IDF)",
+      x = "Liczba klastrów (k)",
+      y = "WCSS"
     ) +
     theme_minimal()
 )
-dev.off()
 
-tfidf_clusters <- tibble(
-  title = songs_stem_text$title,
-  artist = songs_stem_text$artist,
-  year = songs_stem_text$year,
-  cluster_tfidf = km_tfidf$cluster
-)
-
+# PCA dla TF-IDF
 pca_tfidf <- prcomp(tfidf_scaled)
-pca_tfidf_df <- tibble(
-  title = songs_stem_text$title,
+pca_tfidf_df <- data.frame(
+  title = rownames(tfidf_scaled),
   cluster = factor(km_tfidf$cluster),
   PC1 = pca_tfidf$x[, 1],
   PC2 = pca_tfidf$x[, 2]
 )
 
-png("pca_tfidf_kmeans.png", width = 900, height = 700)
-print((
-  ggplot(pca_tfidf_df, aes(PC1, PC2, color = cluster, label = title)) +
-    geom_point(size = 3, alpha = 0.85) +
-    geom_text(size = 2, alpha = 0.6, vjust = -0.5) +
+print(
+  ggplot(pca_tfidf_df, aes(x = PC1, y = PC2, color = cluster)) +
+    geom_point(size = 3, alpha = 0.7) +
     labs(
-      title = paste("K-means (TF-IDF), k =", best_k_tfidf, "- PCA (PC1 vs PC2)"),
+      title = paste("K-means (TF-IDF), k =", best_k_tfidf, "- PCA"),
       x = paste("PC1 (", round(summary(pca_tfidf)$importance[2, 1] * 100, 1), "%)"),
-      y = paste("PC2 (", round(summary(pca_tfidf)$importance[2, 2] * 100, 1), "%)"),
-      color = "Klaster"
+      y = paste("PC2 (", round(summary(pca_tfidf)$importance[2, 2] * 100, 1), "%)")
     ) +
     theme_minimal()
 )
-dev.off()
 
 
-freq_all_top100 <- arrange(freq_all, desc(n)) %>% slice_head(n = 100)
-print("Top 100 najczesciej stosowanych stemow:")
-print(freq_all_top100)
+# 7. Podsumowanie wyników ----
 
-print("\nZagrupowanie w klastrach (BoW):")
-print(arrange(bow_clusters, cluster_bow, year, title))
+cat("\n========== PODSUMOWANIE ANALIZY ==========\n")
+cat("Liczba przeanalizowanych piosenek:", nrow(songs), "\n")
+cat("Lata:", paste(sort(unique(songs$year)), collapse = ", "), "\n")
+cat("Liczba unikalnych słów (po czyszczeniu):", length(unique(tokens$word)), "\n")
+cat("Liczba unikalnych rdzeni:", length(unique(tokens$stem)), "\n")
+cat("\nTop 20 najczęstszych słów:\n")
+print(head(freq_all, 20))
 
-print("\nZagrupowanie w klastrach (TF-IDF):")
-print(arrange(tfidf_clusters, cluster_tfidf, year, title))
+cat("\nOptymalne k (BoW):", best_k_bow, "\n")
+cat("Optymalne k (TF-IDF):", best_k_tfidf, "\n")
 
-print("\nSentyment roczny:")
-print(sentiment_by_year)
-
-print("Analiza zakonczona.")
-print("Optymalne k (BoW): ", best_k_bow)
-print("Optymalne k (TF-IDF): ", best_k_tfidf)
+cat("\n========== ANALIZA ZAKONCZONA ==========\n")
