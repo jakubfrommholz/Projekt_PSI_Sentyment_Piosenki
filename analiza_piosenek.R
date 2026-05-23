@@ -1,3 +1,31 @@
+#' ---
+#' title: "Analiza Sentymentu Piosenek Bilboard"
+#' author: "Magdalena Rychlewska, Jakub Frommholz"
+#' output:
+#'    html_document:
+#'      df_print: paged
+#'      theme: cerulean
+#'      highlight: default
+#'      toc: yes
+#'      toc_depth: 3
+#'      toc_float:
+#'         collapsed: false
+#'         smooth_scroll: true
+#'      code_fold: show
+#' ---
+#' 
+#' 
+
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE
+)
+
+
+# ## 1. Wczytywanie danych
+#' W tej sekcji wczytujemy pliki tekstowe i parsujemy metadane oraz tekst piosenki.
+
+# Wymagane pakiety ----
 library(tm)
 library(wordcloud)
 library(RColorBrewer)
@@ -12,25 +40,29 @@ library(cluster)
 library(DT)
 library(topicmodels)
 
-set.seed(123)
+set.seed(42)
 
 txt_files <- list.files(pattern = "\\.txt$", full.names = TRUE)
-if (length(txt_files) == 0) stop("Brak plikow .txt w katalogu roboczym.")
 
+## Funkcja pomocnicza: wyciąga wartość pola (np. Title, Artist) z nagłówka pliku
 extract_field <- function(lines, field) {
+  # Szuka linii zaczynającej się od "Field:"
   hit <- grep(paste0("^", field, ":"), lines, ignore.case = TRUE, value = TRUE)
   if (length(hit) == 0) return(NA_character_)
+  # Usuwa część przed dwukropkiem i przycina spacje
   str_trim(sub(paste0("^", field, ":"), "", hit[1], ignore.case = TRUE))
 }
 
 read_song <- function(path) {
   lines <- readLines(path, warn = FALSE, encoding = "UTF-8")
+  # Parsowanie pól metadanych
   title <- extract_field(lines, "Title")
   artist <- extract_field(lines, "Artist")
   year_raw <- extract_field(lines, "Year")
   place_raw <- extract_field(lines, "Place")
   genre <- extract_field(lines, "Genre")
 
+  # Znajdź separator między metadanymi a tekstem (----)
   sep_idx <- grep("----", lines)[1]
   if (is.na(sep_idx)) {
     lyrics <- lines
@@ -38,6 +70,7 @@ read_song <- function(path) {
     lyrics <- lines[(sep_idx + 1):length(lines)]
   }
 
+  # Usuń puste linie i połącz w jeden ciąg tekstowy
   lyrics <- lyrics[nchar(str_trim(lyrics)) > 0]
   lyrics_text <- paste(lyrics, collapse = " ")
 
@@ -55,13 +88,12 @@ read_song <- function(path) {
 songs_raw <- map_dfr(txt_files, read_song)
 
 songs <- songs_raw %>%
+  # Filtruj niepoprawne / puste dokumenty oraz nadaj identyfikatory
   filter(!is.na(year), !is.na(text), nchar(str_trim(text)) > 0) %>%
   mutate(
     song_id = row_number(),
     title = if_else(is.na(title) | title == "", file, title)
   )
-
-if (nrow(songs) < 3) stop("Za malo poprawnych dokumentow do analiz klastrowania (minimum 3).")
 
 custom_stopwords <- tibble(
   word = c(
@@ -70,6 +102,9 @@ custom_stopwords <- tibble(
     "title", "artist", "year", "place", "genre"
   )
 ) %>% distinct()
+
+#' ## 2. Czyszczenie i tokenizacja
+#' Usuwamy znaki, stosujemy filtrowanie stop-słów i stemming.
 
 tokens_clean <- songs %>%
   select(song_id, year, title, artist, text) %>%
@@ -81,6 +116,9 @@ tokens_clean <- songs %>%
 
 tokens_stemmed <- tokens_clean %>%
   mutate(stem = wordStem(word, language = "en"))
+
+#' ## 3. Chmury słów (globalne i roczne)
+#' Generujemy wykresy chmur słów i zapisujemy jako PNG.
 
 freq_all <- tokens_stemmed %>%
   count(stem, sort = TRUE)
@@ -117,6 +155,9 @@ for (yy in sort(unique(freq_year$year))) {
     dev.off()
   }
 }
+
+#' ## 4. Analiza sentymentu
+#' Szacujemy sentyment QDAP oraz prosty indeks z słownika Bing.
 
 songs_stem_text <- tokens_stemmed %>%
   group_by(song_id, year, title, artist) %>%
@@ -175,6 +216,9 @@ dtm <- removeSparseTerms(dtm, sparse = 0.98)
 dtm_m <- as.matrix(dtm)
 
 if (ncol(dtm_m) < 2) stop("Za malo cech po czyszczeniu DTM. Zmien prog removeSparseTerms.")
+
+#' ## 5. Klastrowanie i wizualizacje
+#' Budujemy macierz DTM/TF-IDF, skalujemy i dobieramy k przez silhouette.
 
 dtm_scaled <- scale(dtm_m)
 rownames(dtm_scaled) <- songs_stem_text$title
