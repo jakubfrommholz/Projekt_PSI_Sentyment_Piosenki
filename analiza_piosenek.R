@@ -3,7 +3,7 @@
 #' author: "Magdalena Rychlewska, Jakub Frommholz"
 #' output:
 #'    html_document:
-#'      df_print: paged
+#'      df_print(: paged
 #'      theme: cerulean
 #'      highlight: default
 #'      toc: yes
@@ -183,7 +183,7 @@ sentiment_by_year <- sentiment_year %>%
   arrange(year)
 
 png("sentyment_qdap.png", width = 800, height = 600)
-print(
+print((
   ggplot(sentiment_by_year, aes(x = year, y = avg_sentiment_qdap)) +
     geom_line(color = "#2c7fb8", linewidth = 1) +
     geom_point(color = "#2c7fb8", size = 2) +
@@ -197,7 +197,7 @@ print(
 dev.off()
 
 png("sentyment_bing.png", width = 800, height = 600)
-print(
+print((
   ggplot(sentiment_by_year, aes(x = year, y = bing_index)) +
     geom_line(color = "#d95f0e", linewidth = 1) +
     geom_point(color = "#d95f0e", size = 2) +
@@ -245,7 +245,7 @@ best_k_bow <- k_eval_bow$best_k
 km_bow <- kmeans(dtm_scaled, centers = best_k_bow, nstart = 50, iter.max = 300)
 
 png("silhouette_bow.png", width = 800, height = 600)
-print(
+print((
   ggplot(k_eval_bow$sil_tbl, aes(k, silhouette)) +
     geom_line(color = "#1b9e77", linewidth = 1) +
     geom_point(color = "#1b9e77", size = 2) +
@@ -275,7 +275,7 @@ pca_bow_df <- tibble(
 )
 
 png("pca_bow_kmeans.png", width = 900, height = 700)
-print(
+print((
   ggplot(pca_bow_df, aes(PC1, PC2, color = cluster, label = title)) +
     geom_point(size = 3, alpha = 0.85) +
     geom_text(size = 2, alpha = 0.6, vjust = -0.5) +
@@ -300,7 +300,7 @@ best_k_tfidf <- k_eval_tfidf$best_k
 km_tfidf <- kmeans(tfidf_scaled, centers = best_k_tfidf, nstart = 50, iter.max = 300)
 
 png("silhouette_tfidf.png", width = 800, height = 600)
-print(
+print((
   ggplot(k_eval_tfidf$sil_tbl, aes(k, silhouette)) +
     geom_line(color = "#7570b3", linewidth = 1) +
     geom_point(color = "#7570b3", size = 2) +
@@ -330,7 +330,7 @@ pca_tfidf_df <- tibble(
 )
 
 png("pca_tfidf_kmeans.png", width = 900, height = 700)
-print(
+print((
   ggplot(pca_tfidf_df, aes(PC1, PC2, color = cluster, label = title)) +
     geom_point(size = 3, alpha = 0.85) +
     geom_text(size = 2, alpha = 0.6, vjust = -0.5) +
@@ -346,18 +346,18 @@ dev.off()
 
 
 freq_all_top100 <- arrange(freq_all, desc(n)) %>% slice_head(n = 100)
-message("Top 100 najczesciej stosowanych stemow:")
+print("Top 100 najczesciej stosowanych stemow:")
 print(freq_all_top100)
 
-message("\nZagrupowanie w klastrach (BoW):")
+print("\nZagrupowanie w klastrach (BoW):")
 print(arrange(bow_clusters, cluster_bow, year, title))
 
-message("\nZagrupowanie w klastrach (TF-IDF):")
+print("\nZagrupowanie w klastrach (TF-IDF):")
 print(arrange(tfidf_clusters, cluster_tfidf, year, title))
 
-message("\nSentyment roczny:")
+print("\nSentyment roczny:")
 print(sentiment_by_year)
 
-message("Analiza zakonczona.")
-message("Optymalne k (BoW): ", best_k_bow)
-message("Optymalne k (TF-IDF): ", best_k_tfidf)
+print("Analiza zakonczona.")
+print("Optymalne k (BoW): ", best_k_bow)
+print("Optymalne k (TF-IDF): ", best_k_tfidf)
